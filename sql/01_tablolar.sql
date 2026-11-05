@@ -1,9 +1,9 @@
 -- =====================================================================
--- BIST Hisse Senedi Takip ve Al/Sat Sinyal Uretimi Web Uygulamasi
--- 01_tablolar.sql : Veritabani ve tablolarin olusturulmasi (DDL)
--- Veritabani: Microsoft SQL Server
--- Not: Bu betik bir kez calistirilir. Tekrar calistirmak icin once
---      BistDB veritabanini silin (DROP DATABASE BistDB).
+-- bist hisse takip ve sinyal uygulamasi veritabani taslagim
+-- 01_tablolar.sql : tablolari ve baglantilari tanimladigim ddl dosyasi
+-- ms sql server üzerinde calisiyorum
+-- not: sifirdan kurarken sorun cikmasin diye bistdb varsa silip
+--      oyle calistirmak lazim (drop database bistdb)
 -- =====================================================================
 
 IF DB_ID('BistDB') IS NULL
@@ -14,34 +14,50 @@ USE BistDB;
 GO
 
 -- ---------------------------------------------------------------------
--- 1. Sektor
+-- tablolar zaten varsa once bagimlilik sirasina gore siliyorum
+-- ---------------------------------------------------------------------
+DROP TABLE IF EXISTS AnlikFiyat;
+DROP TABLE IF EXISTS StagingFiyat;
+DROP TABLE IF EXISTS IslemLog;
+DROP TABLE IF EXISTS PortfoyIslem;
+DROP TABLE IF EXISTS IzlemeListesi;
+DROP TABLE IF EXISTS Kullanici;
+DROP TABLE IF EXISTS Sinyal;
+DROP TABLE IF EXISTS TeknikGosterge;
+DROP TABLE IF EXISTS FiyatGecmisi;
+DROP TABLE IF EXISTS Hisse;
+DROP TABLE IF EXISTS Sektor;
+GO
+
+-- ---------------------------------------------------------------------
+-- 1. sektor tablosu
+-- sektor isimlerini burada tutuyorum, tekrar etmesin diye unique yaptim
 -- ---------------------------------------------------------------------
 CREATE TABLE Sektor (
     SektorId  INT IDENTITY(1,1) NOT NULL
               CONSTRAINT PK_Sektor PRIMARY KEY,
     SektorAdi NVARCHAR(50) NOT NULL
-              CONSTRAINT UQ_Sektor_SektorAdi UNIQUE
-);
+              CONSTRAINT UQ_Sektor_SektorAdi UNIQUE);
 GO
 
 -- ---------------------------------------------------------------------
--- 2. Hisse
+-- 2. hisse tablosu
+-- borsadaki hisseleri ve bagli olduklari sektorleri buraya bagladim
 -- ---------------------------------------------------------------------
 CREATE TABLE Hisse (
     HisseId   INT IDENTITY(1,1) NOT NULL
               CONSTRAINT PK_Hisse PRIMARY KEY,
     Sembol    NVARCHAR(10)  NOT NULL
-              CONSTRAINT UQ_Hisse_Sembol UNIQUE,      -- ornek: THYAO.IS
+              CONSTRAINT UQ_Hisse_Sembol UNIQUE,      -- thyao.is gibi semboller icin
     SirketAdi NVARCHAR(100) NOT NULL,
     SektorId  INT NOT NULL
-              CONSTRAINT FK_Hisse_Sektor REFERENCES Sektor(SektorId)
-);
+              CONSTRAINT FK_Hisse_Sektor REFERENCES Sektor(SektorId));
 GO
 
 -- ---------------------------------------------------------------------
--- 3. FiyatGecmisi (gunluk fiyatlar)
--- Not: UNIQUE (HisseId, Tarih) kisiti otomatik indeks olusturur.
---      Indeks performans testini ileride ayri bir tabloyla yapacagiz.
+-- 3. fiyatgecmisi (gunluk fiyat hareketleri)
+-- unique(hisseid, tarih) kisitim zaten indeks olusturuyor
+-- ilerde indeks performans testini ayri bir tabloyla deneyecegim
 -- ---------------------------------------------------------------------
 CREATE TABLE FiyatGecmisi (
     FiyatId BIGINT IDENTITY(1,1) NOT NULL
@@ -58,12 +74,12 @@ CREATE TABLE FiyatGecmisi (
             CONSTRAINT CK_FiyatGecmisi_Hacim CHECK (Hacim >= 0),
     CONSTRAINT UQ_FiyatGecmisi_HisseTarih UNIQUE (HisseId, Tarih),
     CONSTRAINT CK_FiyatGecmisi_YuksekDusuk
-        CHECK (Yuksek IS NULL OR Dusuk IS NULL OR Yuksek >= Dusuk)
-);
+        CHECK (Yuksek IS NULL OR Dusuk IS NULL OR Yuksek >= Dusuk));
 GO
 
 -- ---------------------------------------------------------------------
--- 4. TeknikGosterge (hesaplanan hareketli ortalamalar)
+-- 4. teknikgosterge (hareketli ortalama sonuclari)
+-- sma20 ve sma50 gibi hesapladigim ortalamalari tutuyorum
 -- ---------------------------------------------------------------------
 CREATE TABLE TeknikGosterge (
     GostergeId INT IDENTITY(1,1) NOT NULL
@@ -73,12 +89,12 @@ CREATE TABLE TeknikGosterge (
     Tarih      DATE NOT NULL,
     SMA20      DECIMAL(12,4) NULL,
     SMA50      DECIMAL(12,4) NULL,
-    CONSTRAINT UQ_TeknikGosterge_HisseTarih UNIQUE (HisseId, Tarih)
-);
+    CONSTRAINT UQ_TeknikGosterge_HisseTarih UNIQUE (HisseId, Tarih));
 GO
 
 -- ---------------------------------------------------------------------
--- 5. Sinyal (AL / SAT)
+-- 5. sinyal (al / sat sinyalleri)
+-- stratejiden donen al ve sat kararlarini buraya basiyorum
 -- ---------------------------------------------------------------------
 CREATE TABLE Sinyal (
     SinyalId   INT IDENTITY(1,1) NOT NULL
@@ -88,12 +104,12 @@ CREATE TABLE Sinyal (
     Tarih      DATE NOT NULL,
     SinyalTuru NVARCHAR(3) NOT NULL
                CONSTRAINT CK_Sinyal_Turu CHECK (SinyalTuru IN (N'AL', N'SAT')),
-    CONSTRAINT UQ_Sinyal_HisseTarih UNIQUE (HisseId, Tarih)
-);
+    CONSTRAINT UQ_Sinyal_HisseTarih UNIQUE (HisseId, Tarih));
 GO
 
 -- ---------------------------------------------------------------------
--- 6. Kullanici
+-- 6. kullanici tablosu
+-- sisteme kayit olan kullanicilari ve baslangic bakiyelerini tanimladim
 -- ---------------------------------------------------------------------
 CREATE TABLE Kullanici (
     KullaniciId  INT IDENTITY(1,1) NOT NULL
@@ -106,12 +122,12 @@ CREATE TABLE Kullanici (
                  CONSTRAINT DF_Kullanici_Bakiye DEFAULT 100000
                  CONSTRAINT CK_Kullanici_Bakiye CHECK (Bakiye >= 0),
     KayitTarihi  DATETIME NOT NULL
-                 CONSTRAINT DF_Kullanici_KayitTarihi DEFAULT GETDATE()
-);
+                 CONSTRAINT DF_Kullanici_KayitTarihi DEFAULT GETDATE());
 GO
 
 -- ---------------------------------------------------------------------
--- 7. IzlemeListesi (Kullanici <-> Hisse, cok-cok iliski)
+-- 7. izlemelistesi (kullanici ve hisse n-n iliskisi)
+-- kim hangi hisseleri takibe aldiysa burada esliyorum
 -- ---------------------------------------------------------------------
 CREATE TABLE IzlemeListesi (
     KullaniciId   INT NOT NULL
@@ -120,12 +136,12 @@ CREATE TABLE IzlemeListesi (
                   CONSTRAINT FK_IzlemeListesi_Hisse REFERENCES Hisse(HisseId),
     EklenmeTarihi DATETIME NOT NULL
                   CONSTRAINT DF_IzlemeListesi_Eklenme DEFAULT GETDATE(),
-    CONSTRAINT PK_IzlemeListesi PRIMARY KEY (KullaniciId, HisseId)
-);
+    CONSTRAINT PK_IzlemeListesi PRIMARY KEY (KullaniciId, HisseId));
 GO
 
 -- ---------------------------------------------------------------------
--- 8. PortfoyIslem (sanal alim / satim kayitlari)
+-- 8. portfoyislem (sanal alim satim gecmisi)
+-- kullanicilarin sanal ortamda yaptigi islemlerin kayitlari
 -- ---------------------------------------------------------------------
 CREATE TABLE PortfoyIslem (
     IslemId     INT IDENTITY(1,1) NOT NULL
@@ -141,12 +157,12 @@ CREATE TABLE PortfoyIslem (
     Fiyat       DECIMAL(12,4) NOT NULL
                 CONSTRAINT CK_PortfoyIslem_Fiyat CHECK (Fiyat > 0),
     IslemZamani DATETIME NOT NULL
-                CONSTRAINT DF_PortfoyIslem_Zaman DEFAULT GETDATE()
-);
+                CONSTRAINT DF_PortfoyIslem_Zaman DEFAULT GETDATE());
 GO
 
 -- ---------------------------------------------------------------------
--- 9. IslemLog (sistem gunlugu)
+-- 9. islemlog (hata ve sistem loglari)
+-- kod tarafinda patlayan yerleri veya loglari rahat izlemek icin kurdum
 -- ---------------------------------------------------------------------
 CREATE TABLE IslemLog (
     LogId INT IDENTITY(1,1) NOT NULL
@@ -154,12 +170,12 @@ CREATE TABLE IslemLog (
     Zaman DATETIME NOT NULL
           CONSTRAINT DF_IslemLog_Zaman DEFAULT GETDATE(),
     Mesaj NVARCHAR(200) NOT NULL,
-    Hata  NVARCHAR(500) NULL
-);
+    Hata  NVARCHAR(500) NULL);
 GO
 
 -- ---------------------------------------------------------------------
--- 10. StagingFiyat (Yahoo verisinin gecici duragi, kisitsiz ham veri)
+-- 10. stagingfiyat (yahoofinance aktarim alani)
+-- python ile yahoo'dan cekecegim ham verileri once buraya basip sonra isleyecegim
 -- ---------------------------------------------------------------------
 CREATE TABLE StagingFiyat (
     Sembol  NVARCHAR(10)  NULL,
@@ -168,14 +184,13 @@ CREATE TABLE StagingFiyat (
     Yuksek  DECIMAL(12,4) NULL,
     Dusuk   DECIMAL(12,4) NULL,
     Kapanis DECIMAL(12,4) NULL,
-    Hacim   BIGINT        NULL
-);
+    Hacim   BIGINT        NULL);
 GO
 
 -- ---------------------------------------------------------------------
--- 11. AnlikFiyat (her hissenin en son bilinen fiyati - canli liste icin)
--- Hisse ile 1-1 iliski: HisseId hem PK hem FK.
--- Degisim yuzdesi saklanmaz, sorguda hesaplanir (tekrar bilgi olmasin).
+-- 11. anlikfiyat (arayuzde gosterecegim son veriler)
+-- hisse tablosuyla 1-1 bagladim, hisseid hem pk hem fk yaptim
+-- degisim yuzdesini veritabaninda tutmayip query yazarken hesaplayacagim
 -- ---------------------------------------------------------------------
 CREATE TABLE AnlikFiyat (
     HisseId          INT NOT NULL
@@ -185,6 +200,5 @@ CREATE TABLE AnlikFiyat (
                      CONSTRAINT CK_AnlikFiyat_SonFiyat CHECK (SonFiyat > 0),
     OncekiKapanis    DECIMAL(12,4) NULL,
     GuncellemeZamani DATETIME NOT NULL
-                     CONSTRAINT DF_AnlikFiyat_Zaman DEFAULT GETDATE()
-);
+                     CONSTRAINT DF_AnlikFiyat_Zaman DEFAULT GETDATE());
 GO
