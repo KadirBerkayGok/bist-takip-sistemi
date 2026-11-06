@@ -1,15 +1,13 @@
 -- =====================================================================
 -- 02_ornek_veri.sql : sektor ve hisse verileri
--- once 01_tablolar.sql calismis olmali
 -- dosyayi tekrar calistirsam hata vermez (NOT EXISTS sayesinde)
--- 13 sektor ve 30 bilindik hisse ekliyorum
 -- =====================================================================
 
 USE BistDB;                                  -- BistDB veritabanini sectim, komutlar burada calisacak
 GO                                           -- SSMS'e "paket burada bitti" dedim, SQL komutu degil
 
 -- ---------------------------------------------------------------------
--- 1. sektorler (13 tane)
+-- 1. sektorler 
 -- ---------------------------------------------------------------------
 -- once sektor ekledik, cunku Hisse tablosu Sektor'e bagli (FK)
 -- (VALUES ...) = elle yazdigim gecici tablo
@@ -29,7 +27,7 @@ FROM (VALUES                                 -- gecici tabloyu burada yazmaya ba
     (N'Perakende'),
     (N'Otomotiv'),
     (N'Telekomünikasyon'),
-    (N'Gıda ve İçecek'),                     -- hisse sayisi artinca yeni sektorler ekledim
+    (N'Gıda ve İçecek'),                     
     (N'Dayanıklı Tüketim'),
     (N'Kimya'),
     (N'Cam')
@@ -38,7 +36,7 @@ WHERE NOT EXISTS (SELECT 1 FROM Sektor s WHERE s.SektorAdi = v.Ad);   -- tabloda
 GO
 
 -- ---------------------------------------------------------------------
--- 2. hisseler (30 tane)
+-- 2. hisseler 
 -- ---------------------------------------------------------------------
 -- JOIN sektor adindan SektorId'yi buluyor, numara ezberlemiyorum
 -- sektor adini yanlis yazarsam o hisse eklenmez
